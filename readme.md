@@ -1,4 +1,4 @@
-# Reverse-engineering the AverMedia AverTV USB2.0 Plus
+# AverMedia AverTV USB2.0 Plus
 
 ## Board Overview
 ### DC 1120-E
