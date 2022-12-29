@@ -25,5 +25,9 @@
 - Some kind of 8-bit microcontroller
 - Not sure what it's used for
 
+### ALC 655
+
+### 74HCT4052D
+
 ### LG InnoTek TALN-M205T
 - TV Tuner
