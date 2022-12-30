@@ -95,7 +95,7 @@ fn main() -> Result<(), Error> {
     write_ctrl(0x00, 0x60); 
     // Set GPIO 3, 5, 6, 7 direction to OUTPUT
     write_ctrl(0x02, 0xe8);
-    // Disable EEPROM Interface, set direction of GPIO 8, 9 to OUTPUT
+    // Disable EEPROM Interface (disable writes), set direction of GPIO 8, 9 to OUTPUT
     write_ctrl(0x03, 0x83);
     // Set GPIO 1, 2, 3, 5, 6, 7 direction to OUTPUT
     write_ctrl(0x02, 0xef);
@@ -118,6 +118,7 @@ fn main() -> Result<(), Error> {
     write_ctrl(0x00, 0x64);
     // Enable GPIO 2, 5, 6
     write_ctrl(0x00, 0x64);
+    // Enable GPIO 0, 2, 5, 6
     write_ctrl(0x00, 0x65);
     write_ctrl(0x00, 0x64);
     write_ctrl(0x00, 0x64);
@@ -138,7 +139,7 @@ fn main() -> Result<(), Error> {
     write_ctrl(0x00, 0x64);
     write_ctrl(0x00, 0x65);
     // Enable GPIO 0, 5, 6
-    write_ctrl(0x0, 0x61);
+    write_ctrl(0x00, 0x61);
 
     // Why are we reading values we've just written?
     // And then writing them back? These do correspond in WireShark to what was just
@@ -204,7 +205,6 @@ fn main() -> Result<(), Error> {
     write_ctrl(0x116, 0x09);
     write_ctrl(0x117, 0x01);
 
-
     // The first time this is read, it's set to all zeroes.
     // This register controls some video settings (see datasheet).
     let res0 = *read_ctrl(0x100, 1).first().unwrap();
@@ -212,84 +212,164 @@ fn main() -> Result<(), Error> {
     write_ctrl(0x100, 0x33);
     
     if res0 == 0x00 { 
-        // Set sensor address
+        // Set serial COMM address (0xBA is the TI chip)
         write_ctrl(0x203, 0xba);
-        // Serial bus write address (0x7f), pretty sure this is writing to a TI-5150AM1
+        // Serial bus write address (0x7f)
+        // This resets the TI chip (restart microprocessor)
         write_ctrl(0x204, 0x7f);
-        // Serial bus write data
+        // Serial bus write value
         write_ctrl(0x205, 0x00);
+        // Begin write operation
+        write_ctrl(0x200, 0x01);
+        // Serial write ready (wait)
+        let r0 = read_ctrl(0x201, 1).first().unwrap();
+        // Ready = CONTINUE
 
-        write_ctrl(512, 0x01);
-        let r0 = read_ctrl(513, 1).first().unwrap();
-        write_ctrl(520, 0x80);
-        write_ctrl(512, 0x20);
-        let r0 = read_ctrl(513, 1).first().unwrap();
-        let r0 = read_ctrl(521, 1).first().unwrap();
-        write_ctrl(520, 0x81);
-        write_ctrl(512, 0x20);
-        let r0 = read_ctrl(513, 1).first().unwrap();
-        let r0 = read_ctrl(521, 1).first().unwrap();
-        write_ctrl(515, 0xa0);
-        write_ctrl(520, 0x3c);
-        write_ctrl(512, 0x20);
-        let r0 = read_ctrl(513, 1).first().unwrap();
-        let r0 = read_ctrl(521, 1).first().unwrap();
-    }
-    // } else {
-    //     write_ctrl(516, 0x08);
-    //     write_ctrl(517, 0x08);
-    //     write_ctrl(512, 0x05);
-    //     let r0 = read_ctrl(513, 1).first().unwrap();
-    //     write_ctrl(516, 0x30);
-    //     write_ctrl(517, 0x00);
-    //     write_ctrl(512, 0x05);
-    //     let r0 = read_ctrl(513, 1).first().unwrap();
-    //     write_ctrl(516, 0x0f);
-    //     write_ctrl(517, 0x0a);
-    //     write_ctrl(512, 0x05);
-    //     let r0 = read_ctrl(513, 1).first().unwrap();
+        // Read address 0x80 from serial
+        write_ctrl(0x208, 0x80);
+        // Begin read operation (Read device ID MSB from TI)
+        write_ctrl(0x200, 0x20);
+
+        // Get a bunch of info on the serial interface (such as read success)
+        let r0 = read_ctrl(0x201, 1).first().unwrap();
+        // Get read data
+        let r0 = read_ctrl(0x209, 1).first().unwrap();
+
+        // Read address 0x81 from serial (Read device ID LSB from TI)
+        write_ctrl(0x208, 0x81);
+        // Begin read operation 
+        write_ctrl(0x200, 0x20);
+
+        // Get read success
+        let r0 = read_ctrl(0x201, 1).first().unwrap();
+        // Get read data
+        let r0 = read_ctrl(0x209, 1).first().unwrap();
+
+        // Set serial COMM address (a0 is some unknown chip)
+        write_ctrl(0x203, 0xa0);
+        // Read address 0x3c
+        write_ctrl(0x208, 0x3c);
+        // Begin read operation
+        write_ctrl(0x200, 0x20);
+
+        // Get read success
+        let r0 = read_ctrl(0x201, 1).first().unwrap();
+        // Get read data
+        let r0 = read_ctrl(0x209, 1).first().unwrap();
     // }
-    // write_ctrl(1280, 0x94);
-    // write_ctrl(1280, 0x8c);
-    // write_ctrl(1286, 0x01);
-    // write_ctrl(1287, 0x00);
+    } else {
+        // Serial bus write address
+        write_ctrl(0x204, 0x08);
+        // Write value (Set luminance value to a reserved value?)
+        write_ctrl(0x205, 0x08);
+        // Begin write operation
+        write_ctrl(0x200, 0x05);
+        
+        // Serial write ready (wait)
+        let r0 = read_ctrl(0x201, 1).first().unwrap();
 
-    // let r0 = *read_ctrl(256, 1).first().unwrap();
-    // write_ctrl(256, r0 as u16);
+        // Serial bus write address
+        write_ctrl(0x204, 0x28);
+        // Write value (Set video standard to (B, G, H, I, N) PAL ITU-R BT.601)
+        write_ctrl(0x205, 0x04);
+        // Begin write operation
+        write_ctrl(0x200, 0x05);
 
-    // let r0 = *read_ctrl(0, 1).first().unwrap();
-    // write_ctrl(0, 0x6c);
-    // write_ctrl(516, 0x00);
-    // write_ctrl(517, 0x02);
-    // write_ctrl(512, 0x05);
+        // Serial write ready (wait)
+        let r0 = read_ctrl(0x201, 1).first().unwrap();
 
-    // let r0 = *read_ctrl(513, 1).first().unwrap();
-    // write_ctrl(516, 0x03);
-    // write_ctrl(517, 0x6f);
-    // write_ctrl(512, 0x05);
+        // Serial bus write address
+        write_ctrl(0x204, 0x30);
+        // Write value (Adheres to ITU-R BT.656.4 and BT.656.5 timing)
+        write_ctrl(0x205, 0x00);
+        // Begin write operation
+        write_ctrl(0x200, 0x05);
 
-    // let r0 = *read_ctrl(513, 1).first().unwrap();
-    // write_ctrl(256, 0x33);
-    // write_ctrl(1284, 0x10);
-    // write_ctrl(1280, 0x8b);
+        // Serial write ready (wait)
+        let r0 = read_ctrl(0x201, 1).first().unwrap();
 
-    // let r0 = *read_ctrl(1282, 1).first().unwrap();
-    // let r1 = *read_ctrl(1283, 1).first().unwrap();
-    // write_ctrl(1284, 0x10);
-    // write_ctrl(1282, r0 as u16);
-    // write_ctrl(1283, r1 as u16);
-    // write_ctrl(1280, 0x8c);
+        // Serial bus write address
+        write_ctrl(0x204, 0x0f);
+        // Write value (configure what each pin does, which is vsync etc.)
+        write_ctrl(0x205, 0x0a);
+        // Begin write operation
+        write_ctrl(0x200, 0x05);
 
-    // let r0 = *read_ctrl(1282, 1).first().unwrap();
-    // let r1 = *read_ctrl(1283, 1).first().unwrap();
-    // write_ctrl(1284, 0x12);
-    // write_ctrl(1282, 0x08);
-    // write_ctrl(1283, 0x08);
-    // write_ctrl(1280, 0x8c);
+        // Serial write ready (wait)
+        let r0 = read_ctrl(0x201, 1).first().unwrap();
+    }
 
-    // // PAUSE
+    // This is starting audio control
+    // Enable AC97 interface
+    // Reset AC97 interface
+    // Control write phase
+    write_ctrl(0x500, 0x94);
+    // Enable AC97 interface
+    // AC97 Operation
+    // Control write phase
+    write_ctrl(0x500, 0x8c);
+    // Set to 16-bit audio
+    write_ctrl(0x506, 0x01);
+    // Write zeroes to a reserved register??
+    write_ctrl(0x507, 0x00);
+
+    // Read video settings (currently set to 0x33)
+    let r0 = *read_ctrl(0x100, 1).first().unwrap();
+    // I guess set the exact same value again???
+    write_ctrl(0x100, 0x33);
+
+    // Check which GPIOs are outputs
+    let r0 = *read_ctrl(0x0, 1).first().unwrap();
+    // Enable GPIO 2,3,5,6
+    write_ctrl(0x0, 0x6c);
+
+    // Serial bus write address
+    write_ctrl(0x204, 0x00);
+    // Write value (Set composite video input source to AIP1B)
+    write_ctrl(0x205, 0x02);
+    // Begin write operation
+    write_ctrl(0x200, 0x05);
+    // Serial write ready (wait)
+    let r0 = *read_ctrl(0x201, 1).first().unwrap();
+
+    // Serial bus write address
+    write_ctrl(0x204, 0x03);
+    // Write value (Set settings to non-high impedance but enable vblanks)
+    write_ctrl(0x205, 0x6f);
+    // Begin write operation
+    write_ctrl(0x200, 0x05);
+    // Serial write ready (wait)
+    let r0 = *read_ctrl(0x201, 1).first().unwrap();
+
+    // Yes, set this again!!
+    // Set Hsync Positive, Vsync Positive, data is in ITU 656 format, 8-bit data
+    write_ctrl(0x100, 0x33);
+    // Set the command address to 0x10
+    write_ctrl(0x504, 0x10);
+    // Enable AC97, AC97 Operation, Control Read phase, In
+    write_ctrl(0x500, 0x8b);
+
+    // Read command data
+    let r0 = *read_ctrl(0x502, 1).first().unwrap();
+    let r1 = *read_ctrl(0x503, 1).first().unwrap();
+    // Set the command address to 0x10 (RealTek audio chip)
+    write_ctrl(0x504, 0x10);
+    // Write command data back to command?
+    write_ctrl(0x502, r0 as u16);
+    write_ctrl(0x503, r1 as u16);
+    // Enable AC97 interface, AC97 Operation, Control write phase
+    write_ctrl(0x500, 0x8c);
+
+    let r0 = *read_ctrl(0x502, 1).first().unwrap();
+    let r1 = *read_ctrl(0x503, 1).first().unwrap();
+    // Set the command address to 0x12
+    write_ctrl(0x504, 0x12);
+    write_ctrl(0x502, 0x08);
+    write_ctrl(0x503, 0x08);
+    write_ctrl(0x500, 0x8c);
+
     
-    // write_ctrl(1284, 0x0e);
+    write_ctrl(0x504, 0x0e);
     // write_ctrl(1280, 0x8b);
     // let r0 = *read_ctrl(1282, 1).first().unwrap();
     // let r1 = *read_ctrl(1283, 1).first().unwrap();

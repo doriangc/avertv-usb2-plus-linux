@@ -12,7 +12,7 @@
 ### ST A21SP16
 - Audio Amplifier
 
-### A21SP16
+### 93CC46
 - EEPROM
 - Probably what the serial reads go to?
 - https://datasheetspdf.com/pdf-file/1144999/ETC/S-93CC46/1
@@ -31,3 +31,14 @@
 
 ### LG InnoTek TALN-M205T
 - TV Tuner
+- Contains EPCOS  K3965D
+
+
+## Some I2C sinks
+### 0xba
+This is the TI chip
+### 0xc2, 0x86, 0x1c, 0xc2
+These seem to control TV tuning
+Packets 32706 to 34272 in chnl.pcap change channel from 374.75 to 537.50
+
+
